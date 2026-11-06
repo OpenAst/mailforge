@@ -26,7 +26,7 @@ fn main() {
                 .expect("Failed to read from stream");
 
             println!("Bytes received: {bytes_read}");
-            
+
             if bytes_read == 0 {
                 println!("Connection closed by client");
                 break;
@@ -35,6 +35,7 @@ fn main() {
             command_buffer.extend_from_slice(
                 &read_buffer[..bytes_read]
             );
+            println!("Buffer: {:?}", command_buffer);
 
             while let Some(position) = command_buffer
                 .windows(2)
@@ -42,6 +43,38 @@ fn main() {
                     let command = String::from_utf8_lossy(&command_buffer[..position])
                     .into_owned();
 
+                    if command.starts_with("EHLO") {
+                        stream.write_all(
+                            b"250 localhost\r\n"
+                        )
+                        .expect("Failed to send EHLO response");
+                    } else if command.starts_with("MAIL FROM:") {
+                        stream.write_all(
+                            "250 OK\r\n".as_bytes()
+                        )
+                        .expect("Failed to send MAIL FROM response");
+                    } else if command.starts_with("RCPT TO:") {
+                        stream.write_all(
+                            "250 OK\r\n".as_bytes()
+                        )
+                        .expect("Failed to send RCPT TO response");
+                    } else if command == "DATA" {
+                        stream.write_all(
+                            b"354 End data with <CR><LF>.<CR><LF>\r\n"
+                        )
+                        .expect("Failed to send DATA response");
+                    } else if command == "QUIT" {
+                        stream.write_all(
+                            b"221 Bye\r\n"
+                        )
+                        .expect("Failed to send QUIT response");
+                        break;
+                    } else {
+                        stream.write_all(
+                            b"500 Unrecognized command\r\n"
+                        )
+                        .expect("Failed to send unrecognized command response");
+                    }
                     println!("Received command: {command}");
 
                     command_buffer.drain(..position + 2);
